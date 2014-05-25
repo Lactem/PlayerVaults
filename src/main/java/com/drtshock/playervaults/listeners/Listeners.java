@@ -16,12 +16,14 @@
  */
 package com.drtshock.playervaults.listeners;
 
-import com.drtshock.playervaults.PlayerVaults;
-import com.drtshock.playervaults.util.Lang;
-import com.drtshock.playervaults.vaultmanagement.UUIDVaultManager;
-import com.drtshock.playervaults.vaultmanagement.VaultOperations;
-import com.drtshock.playervaults.vaultmanagement.VaultViewInfo;
-import org.bukkit.*;
+import java.io.IOException;
+import java.util.List;
+
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
@@ -35,197 +37,307 @@ import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 
-import java.io.IOException;
+import com.drtshock.playervaults.PlayerVaults;
+import com.drtshock.playervaults.human.Human;
+import com.drtshock.playervaults.util.Lang;
+import com.drtshock.playervaults.vaultmanagement.UUIDVaultManager;
+import com.drtshock.playervaults.vaultmanagement.VaultOperations;
+import com.drtshock.playervaults.vaultmanagement.VaultViewInfo;
 
 public class Listeners implements Listener {
 
-    public PlayerVaults plugin;
-    UUIDVaultManager vm = UUIDVaultManager.getInstance();
+	public PlayerVaults plugin;
+	UUIDVaultManager vm = UUIDVaultManager.getInstance();
 
-    public Listeners(PlayerVaults playerVaults) {
-        this.plugin = playerVaults;
-    }
+	public Listeners(PlayerVaults playerVaults) {
+		this.plugin = playerVaults;
+	}
 
-    public void saveVault(Player player) {
-        if (PlayerVaults.getInstance().getInVault().containsKey(player.getName())) {
-            Inventory inv = player.getOpenInventory().getTopInventory();
-            if (inv.getViewers().size() == 1) {
-                VaultViewInfo info = PlayerVaults.getInstance().getInVault().get(player.getName());
-                try {
-                    vm.saveVault(inv, player.getUniqueId(), info.getNumber());
-                } catch (IOException e) {
-                    // ignore
-                }
+	public void saveVault(Player player) {
+		if (PlayerVaults.getInstance().getInVault()
+				.containsKey(player.getName())) {
+			Inventory inv = player.getOpenInventory().getTopInventory();
+			if (inv.getViewers().size() == 1) {
+				VaultViewInfo info = PlayerVaults.getInstance().getInVault()
+						.get(player.getName());
+				try {
+					vm.saveVault(inv, player.getUniqueId(), info.getNumber());
+				} catch (IOException e) {
+					// ignore
+				}
 
-                PlayerVaults.getInstance().getOpenInventories().remove(info.toString());
-            }
-            PlayerVaults.getInstance().getInVault().remove(player.getName());
-        }
-    }
+				PlayerVaults.getInstance().getOpenInventories()
+						.remove(info.toString());
+			}
+			PlayerVaults.getInstance().getInVault().remove(player.getName());
+		}
+	}
 
-    @EventHandler
-    public void onTeleport(PlayerTeleportEvent event) {
-        saveVault(event.getPlayer());
-    }
+	@EventHandler
+	public void onTeleport(PlayerTeleportEvent event) {
+		saveVault(event.getPlayer());
+	}
 
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        saveVault(event.getPlayer());
-    }
+	@EventHandler
+	public void onQuit(PlayerQuitEvent event) {
+		saveVault(event.getPlayer());
+	}
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        if (PlayerVaults.getInstance().needsUpdate() && (player.isOp() || player.hasPermission("playervaults.notify"))) {
-            player.sendMessage(ChatColor.GREEN + "Version " + PlayerVaults.getInstance().getNewVersion() + " of PlayerVaults is available for download!");
-            player.sendMessage(ChatColor.GREEN + PlayerVaults.getInstance().getLink() + " to view the changelog and download!");
-        }
-    }
+	@EventHandler
+	public void onJoin(PlayerJoinEvent event) {
+		final Player player = event.getPlayer();
+		if (PlayerVaults.getInstance().needsUpdate()
+				&& (player.isOp() || player
+						.hasPermission("playervaults.notify"))) {
+			player.sendMessage(ChatColor.GREEN + "Version "
+					+ PlayerVaults.getInstance().getNewVersion()
+					+ " of PlayerVaults is available for download!");
+			player.sendMessage(ChatColor.GREEN
+					+ PlayerVaults.getInstance().getLink()
+					+ " to view the changelog and download!");
+		}
+		for (int i = 0; i < Human.humans.size(); i++) {
+			Human human = Human.humans.get(i);
+			human.sendToPlayer(player);
+		}
+	}
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        saveVault(event.getEntity());
-    }
+	@EventHandler
+	public void onDeath(PlayerDeathEvent event) {
+		saveVault(event.getEntity());
+	}
 
-    @EventHandler
-    public void onClose(InventoryCloseEvent event) {
-        HumanEntity he = event.getPlayer();
-        if (he instanceof Player) {
-            saveVault((Player) he);
-        }
-    }
+	@EventHandler
+	public void onClose(InventoryCloseEvent event) {
+		HumanEntity he = event.getPlayer();
+		if (he instanceof Player) {
+			saveVault((Player) he);
+		}
+	}
 
-    @EventHandler
-    public void onInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            if (PlayerVaults.getInstance().getInVault().containsKey(player.getName())) {
-                Block block = event.getClickedBlock();
-                // Different inventories that we don't want the player to open.
-                if (block.getType() == Material.CHEST
-                        || block.getType() == Material.TRAPPED_CHEST
-                        || block.getType() == Material.ENDER_CHEST
-                        || block.getType() == Material.FURNACE
-                        || block.getType() == Material.BURNING_FURNACE
-                        || block.getType() == Material.BREWING_STAND
-                        || block.getType() == Material.ENCHANTMENT_TABLE
-                        || block.getType() == Material.BEACON) {
-                    event.setCancelled(true);
-                }
-            }
-        }
-        if (PlayerVaults.getInstance().getSetSign().containsKey(player.getName())) {
-            int i = PlayerVaults.getInstance().getSetSign().get(player.getName()).getChest();
-            boolean self = PlayerVaults.getInstance().getSetSign().get(player.getName()).isSelf();
-            String owner = null;
-            if (!self) {
-                owner = PlayerVaults.getInstance().getSetSign().get(player.getName()).getOwner();
-            }
-            PlayerVaults.getInstance().getSetSign().remove(player.getName());
-            event.setCancelled(true);
-            if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-                if (event.getClickedBlock().getType() == Material.WALL_SIGN || event.getClickedBlock().getType() == Material.SIGN_POST) {
-                    Sign s = (Sign) event.getClickedBlock().getState();
-                    Location l = s.getLocation();
-                    String world = l.getWorld().getName();
-                    int x = l.getBlockX();
-                    int y = l.getBlockY();
-                    int z = l.getBlockZ();
-                    if (self) {
-                        plugin.getSigns().set(world + ";;" + x + ";;" + y + ";;" + z + ".self", true);
-                    } else {
-                        plugin.getSigns().set(world + ";;" + x + ";;" + y + ";;" + z + ".owner", owner);
-                    }
-                    plugin.getSigns().set(world + ";;" + x + ";;" + y + ";;" + z + ".chest", i);
-                    plugin.saveSigns();
-                    player.sendMessage(Lang.TITLE.toString() + Lang.SET_SIGN);
-                } else {
-                    player.sendMessage(Lang.TITLE.toString() + Lang.NOT_A_SIGN);
-                }
-            } else {
-                player.sendMessage(Lang.TITLE.toString() + Lang.NOT_A_SIGN);
-            }
-            return;
-        }
-        Block b = event.getClickedBlock();
-        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            if (b.getType() == Material.WALL_SIGN || b.getType() == Material.SIGN_POST) {
-                Location l = b.getLocation();
-                String world = l.getWorld().getName();
-                int x = l.getBlockX();
-                int y = l.getBlockY();
-                int z = l.getBlockZ();
-                if (plugin.getSigns().getKeys(false).contains(world + ";;" + x + ";;" + y + ";;" + z)) {
-                    int num = PlayerVaults.getInstance().getSigns().getInt(world + ";;" + x + ";;" + y + ";;" + z + ".chest");
-                    if ((player.hasPermission("playervaults.signs.use") && (player.hasPermission("playervaults.signs.bypass") || VaultOperations.checkPerms(player, 99)))) {
-                        boolean self = PlayerVaults.getInstance().getSigns().getBoolean(world + ";;" + x + ";;" + y + ";;" + z + ".self", false);
-                        String owner = null;
-                        if (!self) {
-                            owner = PlayerVaults.getInstance().getSigns().getString(world + ";;" + x + ";;" + y + ";;" + z + ".owner");
-                        }
-                        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(owner != null ? owner : event.getPlayer().getName()); // Not best way but :\
-                        if (offlinePlayer == null) {
-                            player.sendMessage(Lang.TITLE.toString() + Lang.VAULT_DOES_NOT_EXIST.toString());
-                            return;
-                        }
-                        if (self) {
-                            Inventory inv = UUIDVaultManager.getInstance().loadOwnVault(player, num, VaultOperations.getMaxVaultSize(player));
-                            player.openInventory(inv);
-                        } else {
-                            Inventory inv = UUIDVaultManager.getInstance().loadOtherVault(offlinePlayer.getUniqueId(), num, VaultOperations.getMaxVaultSize(offlinePlayer));
-                            player.openInventory(inv);
-                        }
-                        PlayerVaults.getInstance().getInVault().put(player.getName(), new VaultViewInfo((self) ? player.getName() : owner, num));
-                        event.setCancelled(true);
-                        player.sendMessage(Lang.TITLE.toString() + Lang.OPEN_WITH_SIGN.toString().replace("%v", String.valueOf(num)).replace("%p", (self) ? player.getName() : owner));
-                    } else {
-                        player.sendMessage(Lang.TITLE.toString() + Lang.NO_PERMS);
-                    }
-                }
-            }
-        }
-    }
+	@EventHandler
+	public void onInteract(PlayerInteractEvent event) {
+		Player player = event.getPlayer();
+		if (event.getAction() == Action.LEFT_CLICK_AIR) {
+			Human human = getHumanInSight(player);
+			if (human != null) {
+				Bukkit.getServer().dispatchCommand(player,
+						"pv " + human.getNumber());
+				return;
+			}
+		} else if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+			if (PlayerVaults.getInstance().getInVault()
+					.containsKey(player.getName())) {
+				Block block = event.getClickedBlock();
+				// Different inventories that we don't want the player to open.
+				if (block.getType() == Material.CHEST
+						|| block.getType() == Material.TRAPPED_CHEST
+						|| block.getType() == Material.ENDER_CHEST
+						|| block.getType() == Material.FURNACE
+						|| block.getType() == Material.BURNING_FURNACE
+						|| block.getType() == Material.BREWING_STAND
+						|| block.getType() == Material.ENCHANTMENT_TABLE
+						|| block.getType() == Material.BEACON) {
+					event.setCancelled(true);
+				}
+			}
+		}
+		if (PlayerVaults.getInstance().getSetSign()
+				.containsKey(player.getName())) {
+			int i = PlayerVaults.getInstance().getSetSign()
+					.get(player.getName()).getChest();
+			boolean self = PlayerVaults.getInstance().getSetSign()
+					.get(player.getName()).isSelf();
+			String owner = null;
+			if (!self) {
+				owner = PlayerVaults.getInstance().getSetSign()
+						.get(player.getName()).getOwner();
+			}
+			PlayerVaults.getInstance().getSetSign().remove(player.getName());
+			event.setCancelled(true);
+			if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+				if (event.getClickedBlock().getType() == Material.WALL_SIGN
+						|| event.getClickedBlock().getType() == Material.SIGN_POST) {
+					Sign s = (Sign) event.getClickedBlock().getState();
+					Location l = s.getLocation();
+					String world = l.getWorld().getName();
+					int x = l.getBlockX();
+					int y = l.getBlockY();
+					int z = l.getBlockZ();
+					if (self) {
+						plugin.getSigns().set(
+								world + ";;" + x + ";;" + y + ";;" + z
+										+ ".self", true);
+					} else {
+						plugin.getSigns().set(
+								world + ";;" + x + ";;" + y + ";;" + z
+										+ ".owner", owner);
+					}
+					plugin.getSigns().set(
+							world + ";;" + x + ";;" + y + ";;" + z + ".chest",
+							i);
+					plugin.saveSigns();
+					player.sendMessage(Lang.TITLE.toString() + Lang.SET_SIGN);
+				} else {
+					player.sendMessage(Lang.TITLE.toString() + Lang.NOT_A_SIGN);
+				}
+			} else {
+				player.sendMessage(Lang.TITLE.toString() + Lang.NOT_A_SIGN);
+			}
+			return;
+		}
+		Block b = event.getClickedBlock();
+		if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+			if (b.getType() == Material.WALL_SIGN
+					|| b.getType() == Material.SIGN_POST) {
+				Location l = b.getLocation();
+				String world = l.getWorld().getName();
+				int x = l.getBlockX();
+				int y = l.getBlockY();
+				int z = l.getBlockZ();
+				if (plugin.getSigns().getKeys(false)
+						.contains(world + ";;" + x + ";;" + y + ";;" + z)) {
+					int num = PlayerVaults
+							.getInstance()
+							.getSigns()
+							.getInt(world + ";;" + x + ";;" + y + ";;" + z
+									+ ".chest");
+					if ((player.hasPermission("playervaults.signs.use") && (player
+							.hasPermission("playervaults.signs.bypass") || VaultOperations
+							.checkPerms(player, 99)))) {
+						boolean self = PlayerVaults
+								.getInstance()
+								.getSigns()
+								.getBoolean(
+										world + ";;" + x + ";;" + y + ";;" + z
+												+ ".self", false);
+						String owner = null;
+						if (!self) {
+							owner = PlayerVaults
+									.getInstance()
+									.getSigns()
+									.getString(
+											world + ";;" + x + ";;" + y + ";;"
+													+ z + ".owner");
+						}
+						OfflinePlayer offlinePlayer = Bukkit
+								.getOfflinePlayer(owner != null ? owner : event
+										.getPlayer().getName()); // Not best way
+																	// but :\
+						if (offlinePlayer == null) {
+							player.sendMessage(Lang.TITLE.toString()
+									+ Lang.VAULT_DOES_NOT_EXIST.toString());
+							return;
+						}
+						if (self) {
+							Inventory inv = UUIDVaultManager.getInstance()
+									.loadOwnVault(
+											player,
+											num,
+											VaultOperations
+													.getMaxVaultSize(player));
+							player.openInventory(inv);
+						} else {
+							Inventory inv = UUIDVaultManager
+									.getInstance()
+									.loadOtherVault(
+											offlinePlayer.getUniqueId(),
+											num,
+											VaultOperations
+													.getMaxVaultSize(offlinePlayer));
+							player.openInventory(inv);
+						}
+						PlayerVaults
+								.getInstance()
+								.getInVault()
+								.put(player.getName(),
+										new VaultViewInfo((self) ? player
+												.getName() : owner, num));
+						event.setCancelled(true);
+						player.sendMessage(Lang.TITLE.toString()
+								+ Lang.OPEN_WITH_SIGN
+										.toString()
+										.replace("%v", String.valueOf(num))
+										.replace(
+												"%p",
+												(self) ? player.getName()
+														: owner));
+					} else {
+						player.sendMessage(Lang.TITLE.toString()
+								+ Lang.NO_PERMS);
+					}
+				}
+			}
+		}
+	}
 
-    @EventHandler
-    public void onBlockPhysics(BlockPhysicsEvent event) {
-        blockChangeCheck(event.getBlock().getLocation());
-    }
+	@EventHandler
+	public void onBlockPhysics(BlockPhysicsEvent event) {
+		blockChangeCheck(event.getBlock().getLocation());
+	}
 
-    @EventHandler
-    public void onEntityChangeBlock(EntityChangeBlockEvent event) {
-        blockChangeCheck(event.getBlock().getLocation());
-    }
+	@EventHandler
+	public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+		blockChangeCheck(event.getBlock().getLocation());
+	}
 
-    @EventHandler
-    public void onBlockBreak(BlockBreakEvent event) {
-        blockChangeCheck(event.getBlock().getLocation());
-    }
+	@EventHandler
+	public void onBlockBreak(BlockBreakEvent event) {
+		blockChangeCheck(event.getBlock().getLocation());
+	}
 
-    /**
-     * Check if the location given is a sign, and if so, remove it from the signs.yml file
-     *
-     * @param location The location to check
-     */
-    public void blockChangeCheck(Location location) {
-        String world = location.getWorld().getName();
-        int x = location.getBlockX();
-        int y = location.getBlockY();
-        int z = location.getBlockZ();
-        if (plugin.getSigns().getKeys(false).contains(world + ";;" + x + ";;" + y + ";;" + z)) {
-            plugin.getSigns().set(world + ";;" + x + ";;" + y + ";;" + z, null);
-            plugin.saveSigns();
-        }
-    }
+	/**
+	 * Check if the location given is a sign, and if so, remove it from the
+	 * signs.yml file
+	 * 
+	 * @param location
+	 *            The location to check
+	 */
+	private void blockChangeCheck(Location location) {
+		String world = location.getWorld().getName();
+		int x = location.getBlockX();
+		int y = location.getBlockY();
+		int z = location.getBlockZ();
+		if (plugin.getSigns().getKeys(false)
+				.contains(world + ";;" + x + ";;" + y + ";;" + z)) {
+			plugin.getSigns().set(world + ";;" + x + ";;" + y + ";;" + z, null);
+			plugin.saveSigns();
+		}
+	}
 
-    @EventHandler
-    public void onInteractEntity(PlayerInteractEntityEvent event) {
-        Player player = event.getPlayer();
-        EntityType type = event.getRightClicked().getType();
-        if ((type == EntityType.VILLAGER || type == EntityType.MINECART) && PlayerVaults.getInstance().getInVault().containsKey(player.getName())) {
-            event.setCancelled(true);
-        }
-    }
+	@EventHandler
+	public void onInteractEntity(PlayerInteractEntityEvent event) {
+		Player player = event.getPlayer();
+		EntityType type = event.getRightClicked().getType();
+		if ((type == EntityType.VILLAGER || type == EntityType.MINECART)
+				&& PlayerVaults.getInstance().getInVault()
+						.containsKey(player.getName())) {
+			event.setCancelled(true);
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private Human getHumanInSight(Player player) {
+		Location eyeLoc = null;
+		List<Block> locs = player.getLineOfSight(null, 4);
+		for (int i = 0; i < Human.humans.size(); i++) {
+			Human human = Human.humans.get(i);
+			Location loc = human.getLocation();
+			for (Block block : locs) {
+				eyeLoc = block.getLocation();
+				if (loc.getBlockX() == eyeLoc.getBlockX()
+						&& loc.getBlockY() == eyeLoc.getBlockY()
+						&& loc.getBlockZ() == eyeLoc.getBlockZ())
+					return human;
+			}
+		}
+		return null;
+	}
 }

@@ -16,20 +16,16 @@
  */
 package com.drtshock.playervaults;
 
-import com.drtshock.playervaults.commands.DeleteCommand;
-import com.drtshock.playervaults.commands.SignCommand;
-import com.drtshock.playervaults.commands.SignSetInfo;
-import com.drtshock.playervaults.commands.VaultCommand;
-import com.drtshock.playervaults.commands.WorkbenchCommand;
-import com.drtshock.playervaults.listeners.Listeners;
-import com.drtshock.playervaults.tasks.Cleanup;
-import com.drtshock.playervaults.tasks.UUIDConversion;
-import com.drtshock.playervaults.util.Lang;
-import com.drtshock.playervaults.util.Metrics;
-import com.drtshock.playervaults.util.Updater;
-import com.drtshock.playervaults.vaultmanagement.UUIDVaultManager;
-import com.drtshock.playervaults.vaultmanagement.VaultViewInfo;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.logging.Level;
+
 import net.milkbowl.vault.economy.Economy;
+
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -38,9 +34,23 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.io.*;
-import java.util.HashMap;
-import java.util.logging.Level;
+import com.drtshock.playervaults.commands.DeleteCommand;
+import com.drtshock.playervaults.commands.DeleteNPCCommand;
+import com.drtshock.playervaults.commands.NPCCommand;
+import com.drtshock.playervaults.commands.SetVaultCommand;
+import com.drtshock.playervaults.commands.SignCommand;
+import com.drtshock.playervaults.commands.SignSetInfo;
+import com.drtshock.playervaults.commands.VaultCommand;
+import com.drtshock.playervaults.commands.WorkbenchCommand;
+import com.drtshock.playervaults.human.Human;
+import com.drtshock.playervaults.listeners.Listeners;
+import com.drtshock.playervaults.tasks.Cleanup;
+import com.drtshock.playervaults.tasks.UUIDConversion;
+import com.drtshock.playervaults.util.Lang;
+import com.drtshock.playervaults.util.Metrics;
+import com.drtshock.playervaults.util.Updater;
+import com.drtshock.playervaults.vaultmanagement.UUIDVaultManager;
+import com.drtshock.playervaults.vaultmanagement.VaultViewInfo;
 
 public class PlayerVaults extends JavaPlugin {
 
@@ -73,8 +83,13 @@ public class PlayerVaults extends JavaPlugin {
         getCommand("pvdel").setExecutor(new DeleteCommand());
         getCommand("pvsign").setExecutor(new SignCommand());
         getCommand("workbench").setExecutor(new WorkbenchCommand());
+        getCommand("pvnpc").setExecutor(new NPCCommand());
+        getCommand("pvdeletenpc").setExecutor(new DeleteNPCCommand());
+        getCommand("pvnpcset").setExecutor(new SetVaultCommand());
         useVault = setupEconomy();
         startMetrics();
+        Human.plugin = this;
+        Human.humans = Human.deserialize();
 
         if (getConfig().getBoolean("drop-on-death.enabled")) {
             dropOnDeath = true;
@@ -102,6 +117,7 @@ public class PlayerVaults extends JavaPlugin {
 
     @Override
     public void onDisable() {
+    		Human.serialize();
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.inVault.containsKey(player.getName())) {
                 Inventory inventory = player.getOpenInventory().getTopInventory();

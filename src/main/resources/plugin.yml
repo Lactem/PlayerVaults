@@ -17,3 +17,12 @@ commands:
   workbench:
     description: Opens a workbench.
     aliases: [wb]
+  pvnpc:
+    description: Creates an NPC where you are standing.
+    aliases: [vaultnpc]
+  pvdeletenpc:
+    description: Deletes the NPC you are looking at.
+    aliases: [vaultdeletenpc]
+  pvnpcset:
+    description: Sets the vault number to be opened when clicking the NPC you are viewing.
+    aliases: [vaultnpcset]
