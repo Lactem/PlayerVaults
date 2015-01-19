@@ -70,10 +70,8 @@ public class UUIDVaultManager {
         }
 
         VaultViewInfo info = new VaultViewInfo(player.getUniqueId().toString(), number);
-        Inventory inv;
-        if (PlayerVaults.getInstance().getOpenInventories().containsKey(info.toString())) {
-            inv = PlayerVaults.getInstance().getOpenInventories().get(info.toString());
-        } else {
+        Inventory inv = PlayerVaults.getInstance().getOpenInventories().get(info.toString());
+        if (inv == null || size != inv.getSize()) {
             YamlConfiguration playerFile = getPlayerVaultFile(player.getUniqueId());
             if (playerFile.getConfigurationSection("vault" + number) == null) {
                 VaultHolder vaultHolder = new VaultHolder(number);
@@ -108,10 +106,8 @@ public class UUIDVaultManager {
             size = 54;
         }
         VaultViewInfo info = new VaultViewInfo(holder.toString(), number);
-        Inventory inv;
-        if (PlayerVaults.getInstance().getOpenInventories().containsKey(info.toString())) {
-            inv = PlayerVaults.getInstance().getOpenInventories().get(info.toString());
-        } else {
+        Inventory inv = PlayerVaults.getInstance().getOpenInventories().get(info.toString());
+        if (inv == null || size != inv.getSize()) {
             YamlConfiguration playerFile = getPlayerVaultFile(holder);
             if (playerFile.getConfigurationSection("vault" + number) == null) {
                 return null;
